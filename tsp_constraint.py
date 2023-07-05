@@ -1,34 +1,174 @@
-import math
-
-def calculate_total_distance(coordinates, path):
-    total_distance = 0
-    num_cities = len(coordinates)
-
-    for i in range(len(path) - 1):
-        current_node = path[i]
-        next_node = path[i + 1]
-
-        current_coord = coordinates[current_node - 1]
-        next_coord = coordinates[next_node - 1]
-
-        distance = math.sqrt((next_coord[0] - current_coord[0]) ** 2 + (next_coord[1] - current_coord[1]) ** 2)
-        total_distance += distance
-
-    # Add the distance from the last city back to the first city (round trip)
-    first_node = path[0]
-    last_node = path[-1]
-
-    first_coord = coordinates[first_node - 1]
-    last_coord = coordinates[last_node - 1]
-
-    distance = math.sqrt((last_coord[0] - first_coord[0]) ** 2 + (last_coord[1] - first_coord[1]) ** 2)
-    total_distance += distance
-
-    return total_distance
+import random, matplotlib.pyplot as plt, networkx as nx, sys
+from math import sqrt
 
 
+def generate_path_permutation(arr):
+    start = arr[0]
+    return [start] + random.sample(arr[1:], len(arr) - 1)
 
-# Sample coordinates of cities
+
+def generate_population(arr, size):
+    population = []
+    for i in range(size):
+        population.append(generate_path_permutation(arr))
+    return population
+
+
+def calculate_path_cost(arr):
+    # Linear Implementation
+    sum = 0
+    for i in range(len(arr) - 1):
+        node1 = arr[i]
+        node2 = arr[i + 1]
+        if ([node1, node2]) in blockage:
+            sum += sys.maxsize
+        else:
+            sum += dist[node1][node2]
+    if ([arr[0], arr[-1]]) in blockage:
+        sum += sys.maxsize
+    else:
+        sum += dist[arr[-1]][arr[0]]
+    if sum == 0:
+        # returns infinity for invalid paths
+        return sys.maxsize
+    return sum
+
+
+def calculate_fitness(population):
+    fitness = []
+    for i in range(len(population)):
+        fitness.append(calculate_path_cost(population[i]))
+    return fitness
+
+
+def crossover(arr):
+    # self-crossover: one point crossover
+    point = random.randint(1, len(arr) - 1)
+    arr1 = arr[:point]
+    arr2 = arr[point:]
+    arr2 = arr2[::-1]
+
+    arr = arr1 + arr2
+
+    return arr
+
+
+def mutation(arr):
+    point = random.randint(2, len(arr) - 1)
+    pos1 = random.randint(1, point)
+    pos2 = random.randint(point, len(arr) - 1)
+
+    # Scramble Mutation
+    arr2 = arr[pos1:pos2]
+    arr2 = arr2[::-1]
+
+    arr = arr[:pos1] + arr2 + arr[pos2:]
+    return arr
+
+
+def bubbleSort(population, fitness):
+    for i in range(len(fitness)):
+        for j in range(len(fitness) - i - 1):
+            if fitness[j] > fitness[j + 1]:
+                # Swap elements
+                fitness[j], fitness[j + 1] = fitness[j + 1], fitness[j]
+                population[j], population[j + 1] = population[j + 1], population[j]
+    return population, fitness
+
+
+# Roulette Wheel Selection During Parent Selection
+def rouletteWheel(population, fitness):
+    # Bubble sort the fitness and population arrays
+    population, fitness = bubbleSort(population, fitness)
+
+    # Implementation of Roulette Wheel
+    totalSum = sum(fitness)
+
+    rouletteWheel = [0]
+
+    # Making of rouletteWheel Array
+    for i in range(len(population)):
+        rouletteWheel.append(rouletteWheel[i] + fitness[i] / totalSum)
+
+    parent = []
+    # Rotating the wheel ------>
+    for i in range(len(population)):
+        for j in range(len(population)):
+            if rouletteWheel[j] < random.random():
+                parent.append(population[j])
+                break
+
+    return parent
+
+
+def parentSelection(population, fitness):
+    new_population = rouletteWheel(population, fitness)
+    for i in range(len(new_population)):
+        child = crossover(new_population[i])
+
+        if random.random() > 0.2:
+            child = mutation(child)
+
+        new_population[i] = child
+
+    new_fitness = calculate_fitness(new_population)
+    return new_population, new_fitness
+
+
+def survivalSelection(new_population, new_fitness):
+    population = rouletteWheel(new_population, new_fitness)
+    population = population[0 : len(population) // 2]
+    fitness = calculate_fitness(population)
+    return population, fitness
+
+
+def calculate_distance_matrix(coordinates):
+    num_nodes = len(coordinates)
+    distance_matrix = [[0] * num_nodes for _ in range(num_nodes)]
+
+    for i in range(num_nodes):
+        x1, y1 = coordinates[i]
+        for j in range(num_nodes):
+            x2, y2 = coordinates[j]
+            distance = sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+            distance_matrix[i][j] = distance
+
+    return distance_matrix
+
+
+def show_graph(nodes_list):
+    # Initiating a Directed Graph
+    G = nx.DiGraph()
+
+    # Adding edges to the graph
+    for i in range(len(nodes_list) - 1):
+        G.add_edge(
+            nodes_list[i],
+            nodes_list[i + 1],
+            weight=dist[nodes_list[i]][nodes_list[i + 1]],
+        )
+    G.add_edge(
+        nodes_list[-1], nodes_list[0], weight=dist[nodes_list[-1]][nodes_list[0]]
+    )
+
+    # Define the positions for the nodes
+    pos = {i: (coordinates[i][0], coordinates[i][1]) for i in nodes_list}
+
+    node_colors = ["red" if node == start else "green" for node in nodes_list]
+
+    # Plotting the graph
+    nx.draw(G, pos, with_labels=True, arrows=True, node_color=node_colors)
+    # for path in blockage:
+    #     nx.draw_networkx_edges(G, pos, edgelist=[path], edge_color="red")
+    plt.show()
+
+
+# Driver code -------->
+# node = int(input("Node: "))
+# start = int(input("Start Node: "))
+
+
+# Example coordinates
 coordinates = [
     [607455, 953773],
     [845467, 854635],
@@ -385,362 +525,136 @@ coordinates = [
     [252578, 395427],
 ]
 
-# Sample path of nodes (cities)
-path = [
-    0,
-    242,
-    101,
-    235,
-    264,
-    111,
-    243,
-    198,
-    278,
-    50,
-    329,
-    188,
-    10,
-    255,
-    338,
-    51,
-    18,
-    143,
-    75,
-    77,
-    350,
-    292,
-    244,
-    168,
-    246,
-    301,
-    312,
-    314,
-    80,
-    215,
-    227,
-    135,
-    4,
-    318,
-    236,
-    45,
-    146,
-    119,
-    162,
-    306,
-    128,
-    245,
-    42,
-    148,
-    337,
-    99,
-    218,
-    70,
-    189,
-    95,
-    257,
-    71,
-    56,
-    167,
-    125,
-    204,
-    185,
-    159,
-    81,
-    261,
-    106,
-    290,
-    280,
-    317,
-    225,
-    120,
-    92,
-    297,
-    294,
-    152,
-    3,
-    293,
-    222,
-    93,
-    269,
-    31,
-    26,
-    90,
-    29,
-    347,
-    284,
-    43,
-    46,
-    221,
-    108,
-    147,
-    334,
-    224,
-    82,
-    226,
-    38,
-    206,
-    271,
-    191,
-    299,
-    205,
-    183,
-    176,
-    110,
-    286,
-    239,
-    254,
-    79,
-    24,
-    23,
-    13,
-    287,
-    117,
-    328,
-    40,
-    104,
-    212,
-    28,
-    30,
-    217,
-    84,
-    73,
-    309,
-    193,
-    9,
-    136,
-    32,
-    132,
-    21,
-    112,
-    186,
-    247,
-    177,
-    160,
-    232,
-    59,
-    298,
-    137,
-    7,
-    216,
-    114,
-    140,
-    181,
-    323,
-    194,
-    165,
-    166,
-    213,
-    170,
-    331,
-    335,
-    76,
-    54,
-    33,
-    344,
-    121,
-    139,
-    58,
-    55,
-    134,
-    22,
-    64,
-    61,
-    118,
-    311,
-    324,
-    122,
-    145,
-    6,
-    48,
-    127,
-    1,
-    258,
-    268,
-    102,
-    342,
-    138,
-    115,
-    241,
-    78,
-    282,
-    279,
-    67,
-    281,
-    230,
-    98,
-    154,
-    237,
-    195,
-    157,
-    36,
-    277,
-    266,
-    175,
-    203,
-    180,
-    19,
-    199,
-    49,
-    172,
-    184,
-    116,
-    156,
-    270,
-    238,
-    250,
-    326,
-    249,
-    202,
-    41,
-    57,
-    74,
-    63,
-    240,
-    262,
-    208,
-    228,
-    283,
-    209,
-    272,
-    97,
-    210,
-    234,
-    72,
-    229,
-    20,
-    265,
-    85,
-    192,
-    91,
-    285,
-    219,
-    182,
-    351,
-    89,
-    289,
-    142,
-    223,
-    345,
-    320,
-    133,
-    253,
-    346,
-    267,
-    173,
-    17,
-    87,
-    105,
-    327,
-    197,
-    66,
-    88,
-    144,
-    151,
-    251,
-    5,
-    187,
-    94,
-    174,
-    129,
-    348,
-    131,
-    158,
-    39,
-    155,
-    260,
-    83,
-    86,
-    220,
-    68,
-    275,
-    52,
-    252,
-    126,
-    35,
-    190,
-    37,
-    305,
-    11,
-    332,
-    69,
-    288,
-    273,
-    15,
-    263,
-    248,
-    308,
-    196,
-    2,
-    321,
-    149,
-    201,
-    296,
-    164,
-    25,
-    100,
-    12,
-    62,
-    315,
-    333,
-    336,
-    96,
-    340,
-    211,
-    304,
-    60,
-    16,
-    256,
-    169,
-    103,
-    130,
-    307,
-    303,
-    123,
-    163,
-    295,
-    349,
-    153,
-    313,
-    200,
-    53,
-    341,
-    179,
-    113,
-    291,
-    150,
-    325,
-    274,
-    259,
-    27,
-    44,
-    343,
-    8,
-    207,
-    330,
-    171,
-    316,
-    65,
-    276,
-    302,
-    107,
-    322,
-    47,
-    14,
-    214,
-    178,
-    339,
-    34,
-    352,
-    300,
-    233,
-    319,
-    161,
-    109,
-    310,
-    141,
-    124,
-    231,
+node = len(coordinates)
+start = 0
+arr = [i for i in range(node)]
+arr.remove(start)
+arr = [start] + arr
+
+blockage = [
+    # [20, 28],
+    # [6, 35],
+    # [8, 33],
+    # [2, 17],
+    # [16, 19],
+    # [11, 22],
+    # [14, 32],
+    # [1, 10],
+    # [3, 19],
+    # [3, 14],
+    # [31, 37],
+    # [7, 12],
+    # [13, 30],
+    # [36, 41],
+    # [16, 29],
+    # [2, 36],
+    # [7, 15],
+    # [23, 41],
+    # [8, 31],
+    # [5, 41],
+    # [21, 27],
+    # [18, 28],
+    # [9, 27],
+    # [6, 22],
+    # [12, 39],
+    # [10, 37],
+    # [5, 38],
+    # [15, 25],
+    # [4, 26],
+    # [1, 25],
+    # [4, 30],
+    # [26, 33],
+    # [18, 21],
+    # [9, 23],
+    # [39, 40],
+    # [32, 35],
+    # [17, 34],
+    # [11, 24],
+    # [20, 24],
+    # [13, 38],
+    # [34, 40],
+    # [2, 1],
+    # [1, 2],
+    # [3, 4],
+    # [6, 7],
+    # [23, 22],
+    # [14, 15],
+    # [15, 14],
+    # [1, 41],
+    # [2, 41],
+    # [41, 1],
+    # [30, 31],
+    # [16, 13],
+    # [27, 26],
+    # [40, 41],
+    # [0, 41],
+    # [41, 0],
+    # [1, 0],
+    # [0, 1],
+    # [4, 3],
+    # [3, 4],
+    # [26, 27],
+    # [2, 0],
+    # [41, 2],
+    # [0, 2],
+    # [12, 10],
+    # [10, 12],
+    # [11, 12],
+    # [12, 11],
+    # [14, 16],
+    # [16, 14],
 ]
-# Calculate the total distance
-total_distance = calculate_total_distance(coordinates, path)
-print("Total distance:", total_distance)
+
+
+dist = calculate_distance_matrix(coordinates)
+
+# print("Distance: ", dist)
+
+pop_size = int(input("Population size: "))
+population = generate_population(arr, pop_size)
+fitness = calculate_fitness(population)
+# print("Initial Population: ", population)
+# print("Initial Fitness: ", fitness)
+
+# To check the previous generation max fitness value
+prev = 0
+generation_count = 1
+
+while True:
+    # Crossover & Mutation
+    new_population, new_fitness = parentSelection(population, fitness)
+
+    # Survival Function:
+    population, fitness = survivalSelection(
+        new_population + population, new_fitness + fitness
+    )
+
+    print("Generation: ", generation_count)
+    print("Fitness: ", min(fitness))
+
+    # In case of repetions
+    if prev != min(fitness):
+        prev = min(fitness)
+        generation_count += 1
+        continue
+    else:
+        # If all elements in the fitness array are same: reached local maxima
+        for k in range(15):
+            new_population, new_fitness = parentSelection(population, fitness)
+
+            # Survival Function:
+            population, fitness = survivalSelection(
+                new_population + population, new_fitness + fitness
+            )
+
+            generation_count += 1
+            print("Generation: ", generation_count)
+            print("Fitness: ", min(fitness))
+        if prev == min(fitness):
+            break
+
+min_sum = min(fitness)
+list = population[fitness.index(min_sum)]
+print("Min Path: ", list, "\nMin Sum: ", min_sum)
+
+show_graph(list)

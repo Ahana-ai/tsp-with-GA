@@ -1,20 +1,26 @@
 from sys import maxsize
 from math import sqrt
 import time
+import numpy as np
+from functools import lru_cache
 
 start = time.process_time()
 
 
+@lru_cache(maxsize=None)
 def tsp(mask, pos):
-    if visited == mask:
+    mask = list(mask)  # Convert tuple to list for modification
+    if all(mask):
         return dist[pos][0], [1]
 
     ans = maxsize
     path = []
     for i in range(1, node):
-        if mask[i] == 0 and i != pos:
+        if not mask[i] and i != pos:
             mask[i] = 1
-            cost, temp_path = tsp(mask, i)
+            cost, temp_path = tsp(
+                tuple(mask), i
+            )  # Convert back to tuple for memoization
             temp_cost = dist[pos][i] + cost
             if temp_cost < ans:
                 ans = temp_cost
@@ -26,14 +32,15 @@ def tsp(mask, pos):
 
 def calculate_distance_matrix(coordinates):
     num_nodes = len(coordinates)
-    distance_matrix = [[0] * num_nodes for _ in range(num_nodes)]
+    distance_matrix = np.zeros((num_nodes, num_nodes))
 
     for i in range(num_nodes):
-        x1, y1 = coordinates[i]
-        for j in range(num_nodes):
+        for j in range(i + 1, num_nodes):  # Only calculate upper triangular matrix
+            x1, y1 = coordinates[i]
             x2, y2 = coordinates[j]
             distance = sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
             distance_matrix[i][j] = distance
+            distance_matrix[j][i] = distance  # Assign symmetric distance
 
     return distance_matrix
 
@@ -49,15 +56,15 @@ coordinates = [
     [125.0, 60.0],
     [119.0, 68.0],
     [117.0, 74.0],
-    # [99.0, 83.0],
-    # [73.0, 79.0],
-    # [72.0, 91.0],
-    # [37.0, 94.0],
-    # [6.0, 106.0],
-    # [3.0, 97.0],
-    # [21.0, 82.0],
-    # [33.0, 67.0],
-    # [4.0, 66.0],
+    [99.0, 83.0],
+    [73.0, 79.0],
+    [72.0, 91.0],
+    [37.0, 94.0],
+    [6.0, 106.0],
+    [3.0, 97.0],
+    [21.0, 82.0],
+    [33.0, 67.0],
+    [4.0, 66.0],
     # [3.0, 42.0],
     # [27.0, 33.0],
     # [52.0, 41.0],
@@ -83,15 +90,19 @@ coordinates = [
     # [172.0, 82.0],
 ]
 
+
 node = len(coordinates)
-visited = [1 for i in range(node)]
+visited = [1 for _ in range(node)]
 dist = calculate_distance_matrix(coordinates)
-mask = [0 for i in range(node)]
+mask = [0 for _ in range(node)]
 mask[0] = 1
-cost, path = tsp(mask, 0)
+
+path = []
+cost, path = tsp(tuple(mask), 0)
 path = [1] + path
 
 end = time.process_time()
 
-print("Cost: ", cost, "\nPath: ", path)
-print("Time: ", end - start)
+print("Cost:", cost)
+print("Path:", path)
+print("Time:", end - start)
