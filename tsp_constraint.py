@@ -1,5 +1,7 @@
-import random, matplotlib.pyplot as plt, networkx as nx, sys
+import random, matplotlib.pyplot as plt, networkx as nx, sys, time
 from math import sqrt
+
+start = time.process_time()
 
 
 def generate_path_permutation(arr):
@@ -41,7 +43,7 @@ def calculate_fitness(population):
     return fitness
 
 
-def crossover(arr):
+def one_point_crossover(arr):
     # self-crossover: one point crossover
     point = random.randint(1, len(arr) - 1)
     arr1 = arr[:point]
@@ -51,6 +53,57 @@ def crossover(arr):
     arr = arr1 + arr2
 
     return arr
+
+
+def uniform_crossover(parent1, parent2):
+    size = len(parent1)
+
+    point = random.randint(1, size - 1)
+
+    child1 = parent1[:point]
+
+    for gene in parent2:
+        if gene not in child1:
+            child1.append(gene)
+
+    # Create child2 by copying genes from parent2 until the crossover point
+    child2 = parent2[:point]
+
+    # Fill child2 with genes from parent1 that are not already present
+    for gene in parent1:
+        if gene not in child2:
+            child2.append(gene)
+
+    return child1, child2
+
+
+def order_crossover(parent1, parent2):
+    size = len(parent1)
+    # Randomly select two crossover points
+    point1 = random.randint(0, size - 1)
+    point2 = random.randint(0, size - 1)
+
+    # Make sure the two points are distinct
+    while point1 == point2:
+        point2 = random.randint(0, size - 1)
+
+    # Determine the start and end points of the segment to be copied
+    start = min(point1, point2)
+    end = max(point1, point2)
+
+    # Create a copy of parent1 and fill the segment with its genes
+    offspring = parent1[:]
+    offspring[start : end + 1] = parent1[start : end + 1]
+
+    # Fill the remaining positions in the offspring with genes from parent2
+    for gene in parent2:
+        if gene not in offspring[start : end + 1]:
+            for i in range(size):
+                if offspring[i] is None:
+                    offspring[i] = gene
+                    break
+
+    return offspring
 
 
 def mutation(arr):
@@ -99,17 +152,48 @@ def rouletteWheel(population, fitness):
                 break
 
     return parent
+    # return rouletteWheel
 
 
 def parentSelection(population, fitness):
     new_population = rouletteWheel(population, fitness)
     for i in range(len(new_population)):
-        child = crossover(new_population[i])
+        # child = one_point_crossover(new_population[i])
+        child = new_population[i]
+        # child1, child2 = uniform_crossover(new_population[i], new_population[i-1])
+        # child = order_crossover(new_population[i], new_population[i - 1])
 
-        if random.random() > 0.2:
-            child = mutation(child)
+        if random.random() < 0.2:
+            child = one_point_crossover(new_population[i])
+        child = mutation(child)
+        # child1 = mutation(child1)
+        # child2 = mutation(child2)
 
         new_population[i] = child
+        # new_population[i], new_population[i-1] = child1, child2
+
+    # roulette_wheel = rouletteWheel(population, fitness)
+    # new_population = []
+    # # Parent 1 ----------------->
+    # # Rotating the wheel ------>
+    # for i in range(len(population)):
+    #     for j in range(len(population)):
+    #         if roulette_wheel[j] < random.random():
+    #             parent1 = population[j]
+    #         else:
+    #             parent2 = population[j]
+
+    #     child1, child2 = uniform_crossover(parent1, parent2)
+
+    #     if random.random() > 0.2:
+    #         child1 = mutation(child1)
+    #         child2 = mutation(child2)
+
+    #     new_population.append(child1)
+    #     new_population.append(child2)
+
+    # new_population, new_fitness = bubbleSort(new_population, calculate_fitness(new_population))
+
 
     new_fitness = calculate_fitness(new_population)
     return new_population, new_fitness
@@ -119,6 +203,19 @@ def survivalSelection(new_population, new_fitness):
     population = rouletteWheel(new_population, new_fitness)
     population = population[0 : len(population) // 2]
     fitness = calculate_fitness(population)
+
+    # roulette_wheel = rouletteWheel(new_population, new_fitness)
+    # population = []
+    # # Rotating the wheel ------>
+    # for i in range(len(new_population)):
+    #     for j in range(len(new_population)):
+    #         if roulette_wheel[j] < random.random():
+    #             population.append(new_population[j])
+    #             break
+
+    # population = population[0 : len(new_population) // 2]
+    # fitness = calculate_fitness(population)
+
     return population, fitness
 
 
@@ -158,8 +255,8 @@ def show_graph(nodes_list):
 
     # Plotting the graph
     nx.draw(G, pos, with_labels=True, arrows=True, node_color=node_colors)
-    # for path in blockage:
-    #     nx.draw_networkx_edges(G, pos, edgelist=[path], edge_color="red")
+    for path in blockage:
+        nx.draw_networkx_edges(G, pos, edgelist=[path], edge_color="red")
     plt.show()
 
 
@@ -611,6 +708,8 @@ dist = calculate_distance_matrix(coordinates)
 # print("Distance: ", dist)
 
 pop_size = int(input("Population size: "))
+# pop_size = (node//50)*100
+print("Population size: ", pop_size)
 population = generate_population(arr, pop_size)
 fitness = calculate_fitness(population)
 # print("Initial Population: ", population)
@@ -656,5 +755,9 @@ while True:
 min_sum = min(fitness)
 list = population[fitness.index(min_sum)]
 print("Min Path: ", list, "\nMin Sum: ", min_sum)
+
+end = time.process_time()
+print("Time: ", end - start)
+
 
 show_graph(list)
