@@ -1,5 +1,75 @@
+import random, matplotlib.pyplot as plt, networkx as nx, sys, time
 from math import sqrt
-import sys
+from datetime import timedelta
+
+start = time.process_time()
+
+
+def show_graph(nodes_list):
+    # Initiating a Directed Graph
+    G = nx.DiGraph()
+
+    # Adding edges to the graph
+    for i in range(len(nodes_list) - 1):
+        G.add_edge(
+            nodes_list[i],
+            nodes_list[i + 1],
+            weight=dist[nodes_list[i]][nodes_list[i + 1]],
+        )
+    G.add_edge(
+        nodes_list[-1], nodes_list[0], weight=dist[nodes_list[-1]][nodes_list[0]]
+    )
+
+    # Define the positions for the nodes
+    pos = {i: (coordinates[i][0], coordinates[i][1]) for i in nodes_list}
+
+    node_colors = ["red" if node == start else "green" for node in nodes_list]
+
+    # Plotting the graph
+    nx.draw(G, pos, with_labels=True, arrows=True, node_color=node_colors)
+    for path in blockage:
+        nx.draw_networkx_edges(G, pos, edgelist=[path], edge_color="red")
+    plt.show()
+
+
+def generate_path_permutation(arr):
+    start = arr[0]
+    return [start] + random.sample(arr[1:], len(arr) - 1)
+
+
+def generate_population(arr, size):
+    population = []
+    for i in range(size):
+        population.append(generate_path_permutation(arr))
+    return population
+
+
+def calculate_path_cost2(arr):
+    # Check if the fitness value is already computed and cached
+    if tuple(arr) in fitness_cache:
+        return fitness_cache[tuple(arr)]
+
+    # Compute the fitness value
+    sum = 0
+    for i in range(len(arr) - 1):
+        node1 = arr[i]
+        node2 = arr[i + 1]
+        if ([node1, node2]) in blockage:
+            sum += sys.maxsize
+        else:
+            sum += dist[node1][node2]
+    if ([arr[0], arr[-1]]) in blockage:
+        sum += sys.maxsize
+    else:
+        sum += dist[arr[-1]][arr[0]]
+
+    # Cache the fitness value for future use
+    fitness_cache[tuple(arr)] = sum
+
+    if sum == 0:
+        # returns infinity for invalid paths
+        return sys.maxsize
+    return sum
 
 
 def calculate_path_cost(arr):
@@ -22,6 +92,134 @@ def calculate_path_cost(arr):
     return sum
 
 
+def calculate_fitness(population):
+    fitness = []
+    for i in range(len(population)):
+        fitness.append(calculate_path_cost2(population[i]))
+    return fitness
+
+
+def two_point_crossover(parent1, parent2):
+    size = len(parent1)
+
+    # Choose two random crossover points
+    point1 = random.randint(1, size - 2)
+    point2 = random.randint(point1 + 1, size - 1)
+
+    # Create child1 by copying genes from parent1 between the crossover points
+    child1 = parent1[:point1] + parent2[point1:point2] + parent1[point2:]
+
+    # Create child2 by copying genes from parent2 between the crossover points
+    child2 = parent2[:point1] + parent1[point1:point2] + parent2[point2:]
+
+    return child1, child2
+
+
+def uniform_crossover(parent1, parent2):
+    size = len(parent1)
+
+    point = random.randint(1, size - 1)
+
+    child1 = parent1[:point]
+
+    for gene in parent2:
+        if gene not in child1:
+            child1.append(gene)
+
+    # Create child2 by copying genes from parent2 until the crossover point
+    child2 = parent2[:point]
+
+    # Fill child2 with genes from parent1 that are not already present
+    for gene in parent1:
+        if gene not in child2:
+            child2.append(gene)
+
+    return child1, child2
+
+
+def mutation(arr):
+    point = random.randint(2, len(arr) - 1)
+    pos1 = random.randint(1, point)
+    pos2 = random.randint(point, len(arr) - 1)
+
+    # Scramble Mutation
+    arr2 = arr[pos1:pos2]
+    arr2 = arr2[::-1]
+
+    arr = arr[:pos1] + arr2 + arr[pos2:]
+    return arr
+
+
+def rouletteWheel(population, fitness):
+    # Calculate the total fitness of the population
+    total_fitness = sum(fitness)
+
+    # Calculate the relative fitness of each individual
+    relative_fitness = [fitness_value / total_fitness for fitness_value in fitness]
+
+    # Generate a cumulative probability distribution
+    wheel = [sum(relative_fitness[: i + 1]) for i in range(len(relative_fitness))]
+
+    # Select an individual using roulette wheel selection
+    spin = random.random()
+    for i in range(len(wheel) - 1):
+        if wheel[i] <= spin <= wheel[i + 1]:
+            return population[i]
+    num = random.randint(1, len(population) - 1)
+    return population[num]
+
+
+def parentSelection(population, fitness):
+    new_population = []
+
+    for _ in range(0, len(population), 2):
+        parent1 = rouletteWheel(population, fitness)
+        parent2 = rouletteWheel(population, fitness)
+
+        if random.random() > 0.2:
+            # child1, child2 = uniform_crossover(parent1, parent2)
+            child1, child2 = two_point_crossover(parent1, parent2)
+            child1 = mutation(parent1)
+            child2 = mutation(parent2)
+            new_population.append(child1)
+            new_population.append(child2)
+        else:
+            child1, child2 = two_point_crossover(parent1, parent2)
+            # new_population.append(child1)
+            # new_population.append(child2)
+            new_population.append(parent1)
+            new_population.append(parent2)
+
+    new_fitness = calculate_fitness(new_population)
+
+    return new_population, new_fitness
+
+
+def bubbleSort(population, fitness):
+    for i in range(len(fitness)):
+        for j in range(len(fitness) - i - 1):
+            if fitness[j] > fitness[j + 1]:
+                # Swap elements
+                fitness[j], fitness[j + 1] = fitness[j + 1], fitness[j]
+                population[j], population[j + 1] = population[j + 1], population[j]
+    return population, fitness
+
+
+def survivalSelection(new_population, new_fitness):
+    population = []
+    # for _ in range(len(new_population) // 2):
+    #     population.append(rouletteWheel(new_population, new_fitness))
+
+    sorted_population, sorted_fitness = bubbleSort(new_population, new_fitness)
+
+    population = new_population[: len(sorted_population) // 2]
+    fitness = new_fitness[: len(sorted_fitness) // 2]
+
+    # fitness = calculate_fitness(population)
+
+    return population, fitness
+
+
 def calculate_distance_matrix(coordinates):
     num_nodes = len(coordinates)
     distance_matrix = [[0] * num_nodes for _ in range(num_nodes)]
@@ -36,10 +234,6 @@ def calculate_distance_matrix(coordinates):
     return distance_matrix
 
 
-blockage = []
-
-
-# Sample coordinates of cities
 coordinates = [
     [607455, 953773],
     [845467, 854635],
@@ -396,13 +590,76 @@ coordinates = [
     [252578, 395427],
 ]
 
+
+blockage = []
+
+
+node = len(coordinates)
+start = 0  # To be inputted
+arr = [i for i in range(node)]
+arr.remove(start)
+arr = [start] + arr
+
+
 dist = calculate_distance_matrix(coordinates)
 
-# Sample path of nodes (cities)
-path = [0, 311, 281, 118, 55, 61, 78, 342, 230, 122, 134, 42, 48, 258, 324, 64, 102, 1, 67, 6, 138, 282, 11, 279, 99, 145, 58, 268, 245, 22, 128, 127, 119, 337, 148, 306, 162, 146, 299, 40, 307, 237, 163, 236, 98, 45, 115, 69, 154, 139, 126, 130, 305, 103, 169, 332, 142, 318, 179, 38, 57, 341, 74, 63, 309, 193, 287, 136, 7, 114, 117, 286, 261, 298, 71, 206, 273, 104, 204, 160, 21, 189, 232, 349, 70, 157, 191, 295, 123, 218, 303, 241, 277, 36, 263, 132, 121, 226, 32, 195, 205, 344, 215, 68, 113, 53, 56, 140, 267, 183, 253, 289, 345, 320, 83, 133, 180, 73, 335, 317, 326, 33, 331, 202, 249, 181, 41, 167, 89, 200, 110, 323, 228, 170, 28, 106, 82, 224, 59, 216, 13, 240, 153, 186, 288, 185, 137, 257, 271, 266, 328, 95, 15, 175, 203, 81, 212, 177, 247, 112, 159, 125, 313, 217, 290, 166, 213, 30, 283, 165, 280, 23, 84, 239, 43, 85, 284, 265, 31, 351, 194, 20, 54, 176, 34, 120, 229, 72, 334, 29, 300, 262, 210, 79, 93, 234, 24, 192, 209, 272, 3, 208, 293, 90, 26, 91, 152, 269, 214, 233, 221, 219, 347, 254, 182, 14, 222, 319, 46, 178, 97, 250, 108, 339, 49, 47, 352, 76, 322, 92, 346, 225, 19, 199, 260, 86, 220, 275, 223, 321, 246, 164, 161, 301, 296, 259, 329, 111, 340, 336, 308, 35, 37, 256, 196, 141, 227, 190, 310, 149, 80, 201, 9, 252, 2, 314, 135, 248, 312, 4, 52, 168, 327, 109, 197, 291, 66, 27, 343, 116, 184, 107, 88, 297, 144, 151, 147, 105, 156, 94, 173, 65, 172, 285, 244, 17, 294, 39, 155, 87, 158, 348, 8, 270, 292, 131, 251, 238, 143, 207, 171, 18, 330, 12, 325, 100, 316, 350, 264, 150, 198, 235, 304, 278, 315, 25, 211, 242, 60, 333, 124, 231, 50, 16, 101, 62, 255, 96, 243, 75, 77, 174, 129, 338, 302, 5, 51, 10, 276, 187, 188, 274, 44]
 
-# Calculate the total distance
-total_distance = calculate_path_cost(path)
-print("Total distance:", total_distance)
+pop_size = int(input("Population size: "))
+population = generate_population(arr, pop_size)
+fitness_cache = {}
+mutation_cache = {}
+crossover_cache = {}
+fitness = calculate_fitness(population)
 
-print(len(coordinates))
+
+# To check the previous generation max fitness value ----->
+prev = 0
+generation_count = 1
+
+
+while True:
+    # Parent Selection ----->
+    new_population, new_fitness = parentSelection(population, fitness)
+
+    # Survival Selection ----->
+    population, fitness = survivalSelection(
+        new_population + population, new_fitness + fitness
+    )
+
+    print("Generation: ", generation_count)
+    print("Fitness: ", min(fitness))
+
+    # In case of repetions ----->
+    if prev != min(fitness):
+        prev = min(fitness)
+        generation_count += 1
+
+    else:
+        # If all elements in the fitness array are same: reached local minima
+        for k in range(155):
+            # Parent Selection ----->
+            new_population, new_fitness = parentSelection(population, fitness)
+
+            # Survival Selection ----->
+            population, fitness = survivalSelection(
+                new_population + population, new_fitness + fitness
+            )
+
+            generation_count += 1
+            print("Generation: ", generation_count)
+            print("Fitness: ", min(fitness))
+        if prev == min(fitness):
+            break
+
+
+min_sum = min(fitness)
+list = population[fitness.index(min_sum)]
+print("Min Path: ", list, "\nMin Sum: ", min_sum)
+
+
+end = time.process_time()
+
+print("Time: ", end - start, "seconds")
+
+
+show_graph(list)
