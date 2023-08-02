@@ -163,13 +163,16 @@ def parentSelection(population, fitness):
         # child1, child2 = uniform_crossover(new_population[i], new_population[i-1])
         # child = order_crossover(new_population[i], new_population[i - 1])
 
-        if random.random() < 0.2:
+        if random.random() > 0.2:
             child = one_point_crossover(new_population[i])
-        child = mutation(child)
+            child = mutation(child)
+            new_population[i] = child
+        else:
+            child = one_point_crossover(new_population[i])
+            new_population[i] = child
         # child1 = mutation(child1)
         # child2 = mutation(child2)
 
-        new_population[i] = child
         # new_population[i], new_population[i-1] = child1, child2
 
     # roulette_wheel = rouletteWheel(population, fitness)

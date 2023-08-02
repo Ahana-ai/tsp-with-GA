@@ -1,6 +1,5 @@
 import random, matplotlib.pyplot as plt, networkx as nx, sys, time
 from math import sqrt
-from datetime import timedelta
 
 start = time.process_time()
 
@@ -103,14 +102,41 @@ def two_point_crossover(parent1, parent2):
     size = len(parent1)
 
     # Choose two random crossover points
-    point1 = random.randint(1, size - 2)
+    point1 = random.randint(0, size // 2)
     point2 = random.randint(point1 + 1, size - 1)
 
     # Create child1 by copying genes from parent1 between the crossover points
-    child1 = parent1[:point1] + parent2[point1:point2] + parent1[point2:]
+    # child1 = parent1[:point1] + parent2[point1:point2] + parent1[point2:]
+    child1 = parent1[:point1]
+    for i in range(point1, point2):
+        if parent2[i] not in child1:
+            child1.append(parent2[i])
+
+    for i in range(point2, len(parent1)):
+        if parent1[i] not in child1:
+            child1.append(parent1[i])
+
+    if len(parent2) != len(child1):
+        for i in range(len(parent2)):
+            if parent2[i] not in child1:
+                child1.append(parent2[i])
 
     # Create child2 by copying genes from parent2 between the crossover points
-    child2 = parent2[:point1] + parent1[point1:point2] + parent2[point2:]
+    # child2 = parent2[:point1] + parent1[point1:point2] + parent2[point2:]
+    child2 = parent2[:point1]
+    for i in range(point1, point2):
+        if parent1[i] not in child2:
+            child2.append(parent1[i])
+
+    for i in range(point2, len(parent2)):
+        if parent2[i] not in child2:
+            child2.append(parent2[i])
+
+    if len(parent1) != len(child2):
+        for i in range(len(parent1)):
+            if parent1[i] not in child2:
+                child2.append(parent1[i])
+    # print("C1: ", child1, "\nC2: ", child2)
 
     return child1, child2
 
@@ -176,19 +202,24 @@ def parentSelection(population, fitness):
         parent1 = rouletteWheel(population, fitness)
         parent2 = rouletteWheel(population, fitness)
 
-        if random.random() > 0.2:
+        if random.random() > 0.1:
+            # child1, child2 = uniform_crossover(parent1, parent2)
+            # child1, child2 = two_point_crossover(parent1, parent2)
+            # child1 = mutation(child1)
+            # child2 = mutation(child2)
+            child1 = mutation(parent1)
+            child2 = mutation(parent2)
+            new_population.append(child1)
+            new_population.append(child2)
+        else:
             # child1, child2 = uniform_crossover(parent1, parent2)
             child1, child2 = two_point_crossover(parent1, parent2)
             child1 = mutation(parent1)
             child2 = mutation(parent2)
             new_population.append(child1)
             new_population.append(child2)
-        else:
-            child1, child2 = two_point_crossover(parent1, parent2)
-            # new_population.append(child1)
-            # new_population.append(child2)
-            new_population.append(parent1)
-            new_population.append(parent2)
+            # new_population.append(parent1)
+            # new_population.append(parent2)
 
     new_fitness = calculate_fitness(new_population)
 
@@ -607,8 +638,6 @@ dist = calculate_distance_matrix(coordinates)
 pop_size = int(input("Population size: "))
 population = generate_population(arr, pop_size)
 fitness_cache = {}
-mutation_cache = {}
-crossover_cache = {}
 fitness = calculate_fitness(population)
 
 
@@ -636,7 +665,7 @@ while True:
 
     else:
         # If all elements in the fitness array are same: reached local minima
-        for k in range(155):
+        for k in range(50):
             # Parent Selection ----->
             new_population, new_fitness = parentSelection(population, fitness)
 
