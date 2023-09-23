@@ -202,24 +202,40 @@ def parentSelection(population, fitness):
         parent1 = rouletteWheel(population, fitness)
         parent2 = rouletteWheel(population, fitness)
 
-        if random.random() > 0.1:
-            # child1, child2 = uniform_crossover(parent1, parent2)
-            # child1, child2 = two_point_crossover(parent1, parent2)
-            # child1 = mutation(child1)
-            # child2 = mutation(child2)
-            child1 = mutation(parent1)
-            child2 = mutation(parent2)
-            new_population.append(child1)
-            new_population.append(child2)
-        else:
-            # child1, child2 = uniform_crossover(parent1, parent2)
+        # if random.random() > 0.2:
+        #     # child1, child2 = uniform_crossover(parent1, parent2)
+        #     # child1, child2 = two_point_crossover(parent1, parent2)
+        #     # child1 = mutation(child1)
+        #     # child2 = mutation(child2)
+        #     child1 = mutation(parent1)
+        #     child2 = mutation(parent2)
+        #     new_population.append(child1)
+        #     new_population.append(child2)
+        # else:
+        #     # child1, child2 = uniform_crossover(parent1, parent2)
+        #     child1, child2 = two_point_crossover(parent1, parent2)
+        #     child1 = mutation(parent1)
+        #     child2 = mutation(parent2)
+        #     new_population.append(child1)
+        #     new_population.append(child2)
+        #     # new_population.append(parent1)
+        #     # new_population.append(parent2)
+
+        # Determine if parents should undergo crossover or mutation
+        if random.random() <= crossover_percentage:
             child1, child2 = two_point_crossover(parent1, parent2)
-            child1 = mutation(parent1)
-            child2 = mutation(parent2)
-            new_population.append(child1)
-            new_population.append(child2)
-            # new_population.append(parent1)
-            # new_population.append(parent2)
+        else:
+            child1 = parent1[:]
+            child2 = parent2[:]
+
+        # Determine if children should undergo mutation
+        if random.random() <= mutation_percentage:
+            child1 = mutation(child1)
+        if random.random() <= mutation_percentage:
+            child2 = mutation(child2)
+
+        new_population.append(child1)
+        new_population.append(child2)
 
     new_fitness = calculate_fitness(new_population)
 
@@ -621,7 +637,6 @@ coordinates = [
     [252578, 395427],
 ]
 
-
 blockage = []
 
 
@@ -634,6 +649,8 @@ arr = [start] + arr
 
 dist = calculate_distance_matrix(coordinates)
 
+crossover_percentage = 0.4  # 10% of parents will undergo crossover
+mutation_percentage = 0.5  # 80% of children will undergo mutation
 
 pop_size = int(input("Population size: "))
 population = generate_population(arr, pop_size)
@@ -665,7 +682,7 @@ while True:
 
     else:
         # If all elements in the fitness array are same: reached local minima
-        for k in range(50):
+        for k in range(25):
             # Parent Selection ----->
             new_population, new_fitness = parentSelection(population, fitness)
 
